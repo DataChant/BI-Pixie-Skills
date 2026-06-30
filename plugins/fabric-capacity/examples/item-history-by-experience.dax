@@ -1,0 +1,23 @@
+// CU by item, operation, and EXPERIENCE, with throttling in SECONDS, from the Item History tables.
+// Run with --capacity <guid>. Unlike 'Metrics By Item And Operation' (throttling in minutes, no
+// experience), Item History carries Experience (AS, ML, Kusto, ES, SparkCore, lake, SQLDb) AND
+// throttling-seconds in one Capacity Metrics table, per item/operation/day.
+// Add 'Item History Operation'[Day] to the grouping for a per-day trend.
+// To narrow, the report sets optional list params 'WorkspaceIDHistory', 'OperationNameHistory',
+// 'UsernameHistory' (each TREATAS'd onto its *List table); they are not required here.
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Item History Main'[ArtifactName],
+            'Item History Main'[OperationName],
+            'Item History Main'[Experience],
+            "CU_s", SUM('Item History Operation'[CU (s)]),
+            "Throttling_s", SUM('Item History Operation'[Throttling (s)]),
+            "Operations", SUM('Item History Operation'[Operations])
+        ),
+        [CU_s] > 0
+    ),
+    [CU_s], DESC
+)

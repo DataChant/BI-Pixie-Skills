@@ -1,0 +1,20 @@
+// Cross-capacity health overview (the Capacity Metrics "Health" page).
+// Needs NO parameter: the "... by capacity (last 24 hours)" measures spread across every
+// capacity you administer. Swap "(last 24 hours)" for "(last 1 hour)" for near-real-time.
+EVALUATE
+SUMMARIZECOLUMNS(
+    Capacities[Capacity name],
+    Capacities[SKU],
+    Capacities[State],
+    Capacities[Region],
+    "Risk", [Risk status by capacity (last 24 hours)],
+    "Avg util %", [Average utilization by capacity (last 24 hours)],
+    "Throttling (s)", [Throttling(s) by capacity (last 24 hours)],
+    "P95 interactive delay", [P95 interactive delay by capacity (last 24 hours)],
+    "P95 interactive rejection", [P95 interactive rejection by capacity (last 24 hours)],
+    "P95 background rejection", [P95 background rejection by capacity (last 24 hours)],
+    "Usage variance", [Usage variance by capacity (last 24 hours)],
+    "Users", [Users by capacity (last 24 hours)],
+    "Rejected ops", [Rejected operations by capacity (last 24 hours)],
+    "Failed ops", [Failed operations by capacity (last 24 hours)]
+)

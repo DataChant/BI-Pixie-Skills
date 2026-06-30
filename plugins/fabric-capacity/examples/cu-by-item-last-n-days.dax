@@ -1,0 +1,36 @@
+// CU by item over an EXPLICIT date range (the "what changed recently?" question).
+// Most examples sum the whole retained window; this one bounds it by date.
+// Run with --capacity <guid> (the runner adds MPARAMETER 'CapacitiesList').
+//
+// The model has no date M-parameter, so the bound lives in the DAX: edit the 7 below
+// for a different window (e.g. 1 for today, 30 for a month), or replace the relative
+// TODAY() bound with two fixed dates -- see the commented FILTER variant at the bottom.
+//
+// Timezone: 'Metrics By Item And Day'[Date] is the model's day grain (capacity region /
+// model timezone, not necessarily your local day). For a precise sub-day window use the
+// timepoint drill (timepoint-operations.dax) instead.
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Items'[Item name],
+            'Items'[Item kind],
+            'Items'[Workspace name],
+            FILTER(
+                'Metrics By Item And Day',
+                'Metrics By Item And Day'[Date] >= TODAY() - 7
+            ),
+            "CU_s", SUM('Metrics By Item And Day'[CU (s)])
+        ),
+        [CU_s] > 0
+    ),
+    [CU_s], DESC
+)
+
+// --- Fixed two-date window instead of "last N days": replace the inner FILTER with ---
+//   FILTER(
+//       'Metrics By Item And Day',
+//       'Metrics By Item And Day'[Date] >= DATE(2026,6,20)
+//           && 'Metrics By Item And Day'[Date] <= DATE(2026,6,27)
+//   ),

@@ -1,0 +1,8 @@
+EVALUATE
+SELECTCOLUMNS(
+    Capacities,
+    "Capacity", Capacities[Capacity name],
+    "Capacity Id", Capacities[Capacity Id],
+    "SKU", Capacities[SKU],
+    "State", Capacities[State]
+)

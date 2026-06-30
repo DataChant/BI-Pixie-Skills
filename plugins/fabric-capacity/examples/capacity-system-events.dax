@@ -1,0 +1,11 @@
+// Capacity state history: when it was overloaded, paused, resumed, and why (the Compute page
+// "System Events" table). Run with --capacity <guid>. Reasons include InteractiveDelay,
+// InteractiveRejected, AllRejected, SurgeProtectionActive, ManuallyPaused, ManuallyResumed.
+EVALUATE
+SELECTCOLUMNS(
+    'System Events',
+    "State", 'System Events'[Capacity state],
+    "Reason", 'System Events'[Capacity state change reason],
+    "Time", 'System Events'[Capacity state transition time]
+)
+ORDER BY [Time] DESC

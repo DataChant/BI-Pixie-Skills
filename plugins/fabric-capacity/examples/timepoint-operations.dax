@@ -1,0 +1,25 @@
+// WHO and WHAT consumed CU at one 30-second window: named item, operation, and user.
+// This is the deepest drill (the Timepoint page). Run with BOTH:
+//   --capacity <guid> --timepoint 2026-06-27T12:12:30
+// (the runner folds 'CapacitiesList' and 'TimePoint' into one DEFINE for you).
+// Swap 'Timepoint Background Detail' for 'Timepoint Interactive Detail' to see interactive ops.
+// User identity is governed by the tenant "Show user data" admin setting (some rows mask it).
+// Timezone: the --timepoint value must match the model's clock (the same one the Compute page
+// and 'CU Detail'[Window start time] show), NOT your local time. Copy a window start straight
+// from throttling-windows.dax; if a drill comes back empty, you are likely off by a TZ offset.
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Items'[Item name],
+            'Items'[Item kind],
+            'Timepoint Background Detail'[Operation],
+            'Timepoint Background Detail'[User],
+            "Timepoint_CU_s", SUM('Timepoint Background Detail'[Timepoint CU (s)]),
+            "Total_CU_s", SUM('Timepoint Background Detail'[Total CU (s)])
+        ),
+        [Timepoint_CU_s] > 0
+    ),
+    [Timepoint_CU_s], DESC
+)

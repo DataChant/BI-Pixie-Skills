@@ -1,0 +1,14 @@
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Items'[Item name],
+            'Items'[Item kind],
+            'Items'[Workspace name],
+            "CU_s", SUM('Metrics By Item And Day'[CU (s)])
+        ),
+        [CU_s] > 0
+    ),
+    [CU_s], DESC
+)

@@ -1,0 +1,7 @@
+EVALUATE
+SUMMARIZECOLUMNS(
+    'Reports'[Report Name],
+    "Sessions", [Report Sessions],
+    "Interactions", [Total Interactions Within Page],
+    "Users", [Users]
+)

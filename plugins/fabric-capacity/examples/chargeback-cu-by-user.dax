@@ -1,0 +1,14 @@
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Chargeback'[User],
+            'Chargeback'[Experience],
+            "CU_s", SUM('Chargeback'[CU (s)]),
+            "Operations", SUM('Chargeback'[Operations])
+        ),
+        [CU_s] > 0
+    ),
+    [CU_s], DESC
+)

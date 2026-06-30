@@ -1,0 +1,19 @@
+// CU by Fabric domain and subdomain (Chargeback only). No parameter needed.
+// Domains/Subdomains are a grain Capacity Metrics does not have; useful for chargeback by
+// business unit. Rows show "No domain / No subdomain" if the tenant has not assigned Fabric domains.
+// The report renders this with the [CU utilization] measure (= SUM('Chargeback'[CU (s)])) and
+// trends it weekly via 'Dates'[First Day of Week].
+EVALUATE
+TOPN(
+    30,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Domains'[Domain],
+            'Domains'[Subdomain],
+            "CU_s", SUM('Chargeback'[CU (s)]),
+            "Operations", SUM('Chargeback'[Operations])
+        ),
+        [CU_s] > 0
+    ),
+    [CU_s], DESC
+)

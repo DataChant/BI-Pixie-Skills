@@ -1,0 +1,14 @@
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Items'[Item name],
+            'Items'[Item kind],
+            'Workspaces'[Workspace name],
+            "CU_s", SUM('Chargeback'[CU (s)])
+        ),
+        [CU_s] > 0
+    ),
+    [CU_s], DESC
+)

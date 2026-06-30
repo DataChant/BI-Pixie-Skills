@@ -1,0 +1,14 @@
+// Workspaces blocked by workspace-level surge protection, with the affected users and how long
+// they were blocked. Run with --capacity <guid>. Returns no rows if nothing was blocked.
+EVALUATE
+SELECTCOLUMNS(
+    'Surge Protection Blocked Workspaces Detail',
+    "Workspace", 'Surge Protection Blocked Workspaces Detail'[Workspace name],
+    "Blocked date", 'Surge Protection Blocked Workspaces Detail'[Blocked date],
+    "Blocked end", 'Surge Protection Blocked Workspaces Detail'[Blocked end],
+    "Duration (hours)", 'Surge Protection Blocked Workspaces Detail'[Blocked duration (hours)],
+    "Affected users", 'Surge Protection Blocked Workspaces Detail'[Affected users],
+    "Interactive rejected ops", 'Surge Protection Blocked Workspaces Detail'[Interactive rejected operations],
+    "Background rejected ops", 'Surge Protection Blocked Workspaces Detail'[Background rejected operations],
+    "How blocked", 'Surge Protection Blocked Workspaces Detail'[How blocked]
+)

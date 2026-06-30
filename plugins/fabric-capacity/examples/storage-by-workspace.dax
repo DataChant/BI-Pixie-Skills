@@ -1,0 +1,15 @@
+// Storage (GB) by workspace for one capacity (the Storage page). Run with --capacity <guid>.
+// 'Storage By Workspaces'[Utilization (GB)] is the current storage; the model also has
+// 'Storage By Workspaces And Day' for the per-day trend, and a 'Static storage in GB' column.
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Workspaces'[Workspace name],
+            "Storage_GB", SUM('Storage By Workspaces'[Utilization (GB)])
+        ),
+        [Storage_GB] > 0
+    ),
+    [Storage_GB], DESC
+)

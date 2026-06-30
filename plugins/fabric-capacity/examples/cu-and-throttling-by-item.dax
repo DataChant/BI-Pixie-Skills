@@ -1,0 +1,21 @@
+// Top CU consumers on one capacity, with throttling and operation counts (the Compute page
+// "matrix by item and operation"). Run with --capacity <guid> (adds MPARAMETER 'CapacitiesList').
+// Throttling here is in MINUTES (the aggregate grain); the timepoint detail uses seconds.
+EVALUATE
+TOPN(
+    50,
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Items'[Item name],
+            'Items'[Item kind],
+            'Items'[Workspace name],
+            "CU_s", SUM('Metrics By Item And Operation'[CU (s)]),
+            "Throttling_min", SUM('Metrics By Item And Operation'[Throttling (min)]),
+            "Duration_s", SUM('Metrics By Item And Operation'[Duration (s)]),
+            "Operations", SUM('Metrics By Item And Operation'[Operations]),
+            "Users", SUM('Metrics By Item And Operation'[Users])
+        ),
+        [CU_s] > 0
+    ),
+    [CU_s], DESC
+)

@@ -1,0 +1,22 @@
+// The 30-second windows where the capacity was most stressed (behind the Compute page's
+// "utilization and throttling" and "overages" charts). Run with --capacity <guid>.
+// Pick a window's start time here to drill into it with timepoint-operations.dax (--timepoint).
+// 'CU Detail'[Window start time] is in the model's timezone; pass it to --timepoint verbatim
+// (do not convert to local time) or the drill will return no rows.
+// Delay/rejection % > 1.0 means the capacity was over the throttling threshold for that window.
+EVALUATE
+TOPN(
+    50,
+    SELECTCOLUMNS(
+        'CU Detail',
+        "Window", 'CU Detail'[Window start time],
+        "CU_s", 'CU Detail'[CU (s)],
+        "CU_limit", 'CU Detail'[CU limit],
+        "Interactive delay %", 'CU Detail'[Interactive delay %],
+        "Interactive rejection %", 'CU Detail'[Interactive rejection %],
+        "Background rejection %", 'CU Detail'[Background rejection %],
+        "Autoscale CU", 'CU Detail'[Auto scale capacity units],
+        "Processed overage", 'CU Detail'[Processed overage]
+    ),
+    [Interactive delay %], DESC
+)

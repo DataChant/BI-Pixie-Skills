@@ -1,0 +1,19 @@
+{
+  "name": "bi-pixie-skills",
+  "owner": {
+    "name": "DataChant",
+    "url": "https://datachant.com"
+  },
+  "metadata": {
+    "description": "AI-agent skills for Power BI and Microsoft Fabric, from the team behind BI Pixie.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "fabric-capacity",
+      "source": "./plugins/fabric-capacity",
+      "description": "Read Fabric Capacity Unit (CU) usage and CU-vs-engagement ROI from a Pro license (no Premium, no XMLA). Add-on to microsoft/skills-for-fabric.",
+      "version": "0.1.0"
+    }
+  ]
+}
