@@ -74,7 +74,7 @@ Each row is a real, tested query. The example files live in `examples/`.
 |----------------|-------|---------------------|---------|-------|
 | Which capacities are healthy / at risk / throttling right now? | Metrics | `Capacities` + `[Risk status by capacity (last 24 hours)]`, `[Average utilization by capacity ...]`, `[Throttling(s) by capacity ...]`, `[P95 interactive delay by capacity ...]` | `capacity-health-overview.dax` | none |
 | Near-real-time health (last hour) | Metrics | same measures, swap `(last 1 hour)` | `capacity-health-overview.dax` | none |
-| What is consuming my CU? Top items | Metrics | `Items` + `Metrics By Item And Operation`/`...And Day`[CU (s)] | `cu-and-throttling-by-item.dax` | `--capacity` |
+| What is consuming my CU? Top items | Metrics | `Items` + `Metrics By Item And Operation`/`...And Day`[CU (s)] (**blind to items created today**, see Gotchas) | `cu-and-throttling-by-item.dax` | `--capacity` |
 | What changed recently? CU by item over a date range | Metrics | `Items` + `Metrics By Item And Day`[CU (s)] filtered on `[Date]` | `cu-by-item-last-n-days.dax` | `--capacity` |
 | CU by user / by experience | Chargeback | `Chargeback`[User], [Experience], [CU (s)] | `chargeback-cu-by-user.dax` | none |
 | CU by item with cost attribution | Chargeback | `Items`[Item name] + `Chargeback`[CU (s)] | `chargeback-cu-by-item.dax` | none |
@@ -87,6 +87,8 @@ Each row is a real, tested query. The example files live in `examples/`.
 | Which items were throttled? | Metrics | `Items Throttled` (same shape as `Items`) | (adapt `cu-and-throttling-by-item.dax`) | `--capacity` |
 | Memory footprint per item | Metrics | `Max Memory By Item`[Item size (GB)] | (adapt) | `--capacity` |
 | CU by **experience** (AS/ML/Spark/Kusto), with throttling-seconds | Metrics | `Item History Main`[Experience] + `Item History Operation`[CU (s)],[Throttling (s)] | `item-history-by-experience.dax` | `--capacity` |
+| What does a **data agent** question cost? | Metrics | `Item History Main`[ArtifactName],[Experience] + `Item History Operation`[CU (s)],[Operations], filtered to `OperationName = "AI Query"` and `Experience = "ML"` | `ai-query-cost-by-agent.dax` | `--capacity` |
+| Per-question detail for a data agent measurement run | Metrics | `Item History Operation Detail`[OperationStartTime],[CU (s)],[Operations] | `ai-query-operations.dax` | `--capacity` |
 | An item's day-by-day history | Metrics | `Item History Main` + `Item History Operation`[Day] | `item-history-by-experience.dax` (add `[Day]`) | `--capacity` |
 | Billed overage / carryforward over time | Metrics | `[Processed overage]`, `[Overage billing limit CUhr]`, `CU Detail[Processed overage]` | (adapt) | `--capacity` |
 | List capacities + ids + state | Metrics | `Capacities` | `list-capacities.dax` | none |
@@ -141,10 +143,16 @@ Item History (DirectQuery, needs `CapacitiesList`; the three History params belo
 - **Item History Operation**: `Day`, `CU (s)`, `Duration (s)`, `Throttling (s)`, `Operations`,
   `ItemHistoryUniquKey` (join key to Main). Per item/operation/day aggregates.
 - **Item History Operation Detail**: per-operation rows with `WindowStartTime`/`WindowEndTime`,
-  `OperationStartTime`/`OperationEndTime`, `Status`, `CU (s)`, `Throttling (s)`, `Operations`.
+  `OperationStartTime`/`OperationEndTime`, `Status`, `CU (s)`, `Duration (s)`, `Throttling (s)`,
+  `Operations`. `OperationStartTime` bins to **one-minute windows**, so several operations inside
+  one minute arrive as a single row with `Operations` > 1; divide `CU (s)` by it for a per-operation
+  figure, or space the work out. `Duration (s)` is genuine elapsed time for most operations but a
+  flat **60 seconds per operation for `AI Query`**, where it is the billing window rather than how
+  long the data agent took to answer.
 - Why it matters: this is the **only Capacity Metrics table that carries `Experience`** (AS, ML,
   Kusto, ES, SparkCore, lake, SQLDb) and **throttling in seconds**, per item, operation, and day.
   It does the job of `Metrics By Item And Operation` + Chargeback's experience grain in one query.
+  It is also the only place a **newly created item** shows up on its first day (see Gotchas).
 - Optional narrowing (list MParameters, each `TREATAS`'d onto its slicer-list table): `MPARAMETER
   'WorkspaceIDHistory' = {"<ws-guid>", ...}` -> `'Item History Workspace List'[WorkspaceId]`;
   `MPARAMETER 'OperationNameHistory' = {"AI Query", ...}` -> `'Item History Operation Name List'
@@ -184,6 +192,27 @@ Health measures (in the disconnected **All Measures** table; call by name, no pa
 
 ## Gotchas
 
+- **A missing `CapacitiesList` returns ZERO, not an error.** This is the costliest mistake here,
+  because it looks like a measurement. `EVALUATE ROW("CU", SUM('Item History Operation'[CU (s)]))`
+  with no parameter answers `0.0` and exits 0. Always confirm a non-empty `Capacities` scope before
+  believing a quiet result. (A *malformed* parameter does fail loudly: a bare `MPARAMETER` line
+  outside a `DEFINE` block returns "The syntax for 'MPARAMETER' is incorrect".)
+- **The aggregate fact tables are blind to items created the same day.** `Metrics By Item And Day`
+  and `Metrics By Item And Operation` returned **no rows at all** for two data agents built and
+  queried that morning, together worth 38,662 CU s, while `Item History Operation` reported both in
+  full. The `Items` dimension refreshes on its own schedule and the aggregates lag with it, so for
+  any window that includes today, read the **Item History** tables instead. This is not a small
+  correction: the two invisible agents were 5.6% of an F8's entire daily budget.
+- **`Items[Item kind]` is unreliable for data agents.** Filtering `Items` on
+  `Item kind = "DataAgent"` returned 4 of the 7 agents that actually burned CU, and the three it
+  dropped included the two most expensive. Agents are filed under `DataAgent` or `LlmPlugin`
+  inconsistently. `Item History Main[ArtifactKind]` was correct for all seven, so prefer it whenever
+  the kind decides what you include.
+- **One data agent bills as TWO items, and only one of them is the question.** The `DataAgent` item
+  (Experience `ML`, operation `AI Query`) carries the cost of answering; an `LlmPlugin` item
+  (Experience `lake`) carries its OneLake reads and writes. Measured live, `ML` was 25,093 CU s
+  against 5.17 CU s for `lake` on the same agent. Sum both for a total bill; read `ML` alone for
+  what a question costs. Never read `lake` alone.
 - **Throttling units differ**: `Throttling (min)` on the aggregate tables; `Throttling (s)` on the
   timepoint detail and on the health measures.
 - **`CU Detail` percentages**: delay/rejection `%` columns are fractions where `> 1.0` means the

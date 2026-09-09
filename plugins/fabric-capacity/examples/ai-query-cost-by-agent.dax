@@ -1,0 +1,42 @@
+// What each Fabric DATA AGENT costs per question, in CU seconds.
+// Run with --capacity <guid> (the runner adds MPARAMETER 'CapacitiesList').
+//
+// Read the ML row, never the lake rows. One data agent bills under TWO items: a DataAgent
+// item (Experience "ML", OperationName "AI Query") carrying the cost of answering the
+// question, and an LlmPlugin item (Experience "lake") carrying its OneLake reads and writes.
+// Measured on a live F8, the lake side was 0.02% of the total, so reading it instead of the
+// ML row understates a question by three orders of magnitude.
+//
+// This reads Item History rather than 'Metrics By Item And Day' on purpose. The aggregate
+// fact tables return NOTHING for an item created the same day, so an agent built this
+// morning is invisible there while Item History already has it in full.
+//
+// Microsoft's published rates: 100 CU s per 1,000 input tokens, 10 per 1,000 cached input
+// tokens, 400 per 1,000 output tokens. A capacity's daily budget is SKU x 86,400 CU s
+// (F2 = 172,800, F8 = 691,200, F64 = 5,529,600), so CU_s_per_question x expected daily
+// questions against that number is the capacity-planning arithmetic.
+EVALUATE
+ADDCOLUMNS(
+    FILTER(
+        SUMMARIZECOLUMNS(
+            'Item History Main'[WorkspaceName],
+            'Item History Main'[ArtifactName],
+            'Item History Main'[OperationName],
+            'Item History Main'[Experience],
+            "CU_s", SUM('Item History Operation'[CU (s)]),
+            "Questions", SUM('Item History Operation'[Operations]),
+            "Throttling_s", SUM('Item History Operation'[Throttling (s)])
+        ),
+        [CU_s] > 0
+            && 'Item History Main'[OperationName] = "AI Query"
+            && 'Item History Main'[Experience] = "ML"
+    ),
+    "CU_s_per_question", DIVIDE([CU_s], [Questions])
+)
+ORDER BY [CU_s_per_question] DESC
+
+// --- Both halves of the bill (ML answering + lake file I/O) instead of ML only: drop the
+//     Experience predicate and group by it, so the two rows stay separately labelled:
+//   FILTER(SUMMARIZECOLUMNS(...), [CU_s] > 0
+//       && 'Item History Main'[OperationName] IN {"AI Query", "OneLake Read via Proxy",
+//                                                 "OneLake Iterative Read via Proxy"})

@@ -91,6 +91,12 @@ sorted by CU per session descending. Call out:
 - Match the time windows on both sides (for example trailing 14 or 30 days) so the ratio is fair.
 - Item names can collide across workspaces; include the workspace when joining.
 - Aggregate the data agent and SQL-endpoint kinds per logical item, or you will undercount cost
-  (one logical item can appear under multiple `Item kind` values).
+  (one logical item can appear under multiple `Item kind` values). For a data agent those kinds are
+  `DataAgent` (Experience `ML`, the cost of answering) and `LlmPlugin` (Experience `lake`, its
+  OneLake file I/O). Summing them is right **for ROI**, where you want the total bill. It is wrong
+  for cost per question, which is the `ML` row alone; the `lake` side measured 0.02% of the total.
+- Group data agents by `Item History Main`[ArtifactKind], not `Items`[Item kind]. The latter files
+  agents under either kind inconsistently, so filtering it dropped 4 of 7 live agents, including the
+  two most expensive. See `references/capacity-model-guide.md` Gotchas.
 - This is a cost-efficiency heuristic, not an accounting system; pair it with judgment about
   business-critical-but-low-traffic content (board reports, compliance dashboards).

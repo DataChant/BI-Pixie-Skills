@@ -20,7 +20,7 @@ have no first-party tool. For BI Pixie's **own** engagement data, use the
 
 | Skill | What it does |
 |-------|--------------|
-|[`query-fabric-capacity-cu`](plugins/fabric-capacity/skills/query-fabric-capacity-cu/SKILL.md) | Read Fabric Capacity Unit (CU) usage per item, operation, and user from the **Capacity Metrics** and **Chargeback** apps via the Execute Queries DAX REST API. Works on a Pro workspace. |
+|[`query-fabric-capacity-cu`](plugins/fabric-capacity/skills/query-fabric-capacity-cu/SKILL.md) | Read Fabric Capacity Unit (CU) usage per item, operation, and user from the **Capacity Metrics** and **Chargeback** apps via the Execute Queries DAX REST API. Works on a Pro workspace. Includes **what a Fabric data agent question costs** in CU seconds. |
 |[`diagnose-fabric-capacity`](plugins/fabric-capacity/skills/diagnose-fabric-capacity/SKILL.md) | Answer almost any admin question about a capacity: **health and risk**, **throttling and overload**, utilization vs limit, overage, **blocked workspaces and affected users**, storage, the capacity state timeline, and a 30-second **timepoint drill** that names the exact items, operations, and users that consumed CU. |
 |[`fabric-cu-roi`](plugins/fabric-capacity/skills/fabric-cu-roi/SKILL.md) | Join CU cost with report usage to surface **low-ROI** content (high CU, low interactions). |
 

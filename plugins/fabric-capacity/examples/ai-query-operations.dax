@@ -1,0 +1,38 @@
+// Every billed data agent question as its own row, with the minute it ran and what it cost.
+// Run with --capacity <guid>. This is the query for a MEASUREMENT RUN: ask a fixed set of
+// questions, wait about 15 minutes for usage data to land, then read the rows back.
+//
+// Grain: 'Item History Operation Detail' reports OperationStartTime in ONE-MINUTE windows,
+// so two questions answered inside the same minute arrive as a single row with Ops = 2.
+// Divide CU_s by Ops for a per-question figure, or leave a gap between questions.
+//
+// Duration (s) is deliberately NOT selected here. It exists on this table, but for AI Query
+// it reports exactly 60 seconds per operation on every row, which is the billing window and
+// not how long the agent took to answer. It varies for other operations (a notebook run
+// reports its real elapsed time), so it is a live column, just not a latency for this one.
+//
+// Timezone: OperationStartTime is the model's clock, not yours. Trust the column rather than
+// converting from your own local time, and widen the window below if a run looks missing.
+EVALUATE
+FILTER(
+    SUMMARIZECOLUMNS(
+        'Item History Main'[WorkspaceName],
+        'Item History Main'[ArtifactName],
+        'Item History Main'[OperationName],
+        'Item History Operation Detail'[OperationStartTime],
+        "CU_s", SUM('Item History Operation Detail'[CU (s)]),
+        "Ops", SUM('Item History Operation Detail'[Operations]),
+        "Throttling_s", SUM('Item History Operation Detail'[Throttling (s)])
+    ),
+    [CU_s] > 0
+        && 'Item History Main'[OperationName] = "AI Query"
+        && 'Item History Operation Detail'[OperationStartTime] >= TODAY() - 1
+)
+ORDER BY 'Item History Operation Detail'[OperationStartTime] ASC
+
+// --- A fixed measurement window instead of "since yesterday": replace the time predicate ---
+//   && 'Item History Operation Detail'[OperationStartTime] >= DATE(2026,9,8) + TIME(16,0,0)
+//   && 'Item History Operation Detail'[OperationStartTime] <  DATE(2026,9,8) + TIME(17,0,0)
+//
+// Before trusting any measurement, confirm the capacity was not throttled while it ran:
+// see capacity-system-events.dax. A throttled window inflates duration and can retry work.
