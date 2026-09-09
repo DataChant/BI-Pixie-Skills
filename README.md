@@ -39,9 +39,26 @@ are the same in either tool. Add the marketplace, then install the plugin:
 /plugin install fabric-capacity@bi-pixie-skills
 ```
 
-The skills are also plain `SKILL.md` files, so they work with Cursor, Codex, or any other
-SKILL-aware agent: copy a folder from `plugins/fabric-capacity/skills/` into your agent's skills
-directory.
+The skills are also plain [`SKILL.md`](https://agentskills.io/specification) files, so they work
+with GitHub Copilot, Codex, Cursor, or any other SKILL-aware agent.
+
+**Copy the whole `plugins/fabric-capacity/` directory, not just a skill folder.** The three skills
+share one `scripts/run_dax.py`, one `references/capacity-model-guide.md` and one `examples/` set,
+and those sit beside `skills/` rather than inside each skill, so a lone skill folder arrives without
+its runner, its model guide or any of its queries.
+
+| Agent | Where it looks |
+|-------|----------------|
+| Claude Code | the plugin install above, or `.claude/skills/` |
+| GitHub Copilot | the plugin install above, or `.github/skills/` / `~/.copilot/skills/` |
+| Codex / Cursor | the agent's own skills directory |
+
+The commands in each skill refer to `${CLAUDE_PLUGIN_ROOT}`, which only Claude Code sets. Outside a
+plugin install, point it at wherever you copied `fabric-capacity`, or substitute that path:
+
+```bash
+export CLAUDE_PLUGIN_ROOT=~/.copilot/skills/fabric-capacity   # adjust to where you copied it
+```
 
 ## Prerequisites
 

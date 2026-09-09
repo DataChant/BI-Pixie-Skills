@@ -35,8 +35,12 @@ ADDCOLUMNS(
 )
 ORDER BY [CU_s_per_question] DESC
 
-// --- Both halves of the bill (ML answering + lake file I/O) instead of ML only: drop the
-//     Experience predicate and group by it, so the two rows stay separately labelled:
-//   FILTER(SUMMARIZECOLUMNS(...), [CU_s] > 0
-//       && 'Item History Main'[OperationName] IN {"AI Query", "OneLake Read via Proxy",
-//                                                 "OneLake Iterative Read via Proxy"})
+// --- TOTAL bill per agent (ML answering + lake file I/O) instead of cost per question ---
+// Delete BOTH predicates on the last two lines of the FILTER, keeping only [CU_s] > 0. The
+// agent's two items share one ArtifactName, so it groups them together, and keeping
+// Experience in the grouping leaves the ML and lake halves on their own labelled rows.
+// Do NOT try to name the lake operations explicitly: an agent's OneLake traffic spreads
+// across several operation names (read, iterative read, write, other, and via-redirect
+// variants), so an operation list will silently miss some of the bill.
+// Note that CU_s_per_question is meaningless once lake rows are included, because
+// Operations then counts file I/O alongside questions.

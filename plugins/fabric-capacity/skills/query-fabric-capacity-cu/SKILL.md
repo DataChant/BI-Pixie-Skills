@@ -11,6 +11,11 @@ description: >
   For capacity health, throttling, overload, blocked workspaces, and the per-window who/what drill,
   use `diagnose-fabric-capacity`. For cost-efficiency (CU vs engagement), use `fabric-cu-roi`. For
   Fabric CLI sign-in and workspace discovery, use Microsoft's skills-for-fabric.
+compatibility: >
+  Any SKILL.md-aware agent (Claude Code, GitHub Copilot, Codex, Cursor). Needs Python 3
+  plus the Azure CLI (`az login`) or Fabric CLI (`fab auth login`) as a capacity admin.
+  Outside a Claude Code plugin install, ${CLAUDE_PLUGIN_ROOT} is unset: set it to the
+  copied `fabric-capacity` directory, or substitute that path in the commands below.
 allowed-tools: Bash
 ---
 

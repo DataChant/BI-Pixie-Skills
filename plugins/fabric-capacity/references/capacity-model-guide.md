@@ -200,9 +200,11 @@ Health measures (in the disconnected **All Measures** table; call by name, no pa
 - **The aggregate fact tables are blind to items created the same day.** `Metrics By Item And Day`
   and `Metrics By Item And Operation` returned **no rows at all** for two data agents built and
   queried that morning, together worth 38,662 CU s, while `Item History Operation` reported both in
-  full. The `Items` dimension refreshes on its own schedule and the aggregates lag with it, so for
-  any window that includes today, read the **Item History** tables instead. This is not a small
-  correction: the two invisible agents were 5.6% of an F8's entire daily budget.
+  full. Note what this is **not**: both items were already present in the `Items` dimension, so the
+  lag sits in the aggregate facts themselves rather than in item metadata. Re-running the identical
+  query the next day returned both rows, which confirms it is a lag and not a permanent gap. For any
+  window that includes today, read the **Item History** tables. This is not a small correction: the
+  two invisible agents were 5.6% of an F8's entire daily budget.
 - **`Items[Item kind]` is unreliable for data agents.** Filtering `Items` on
   `Item kind = "DataAgent"` returned 4 of the 7 agents that actually burned CU, and the three it
   dropped included the two most expensive. Agents are filed under `DataAgent` or `LlmPlugin`
@@ -212,7 +214,10 @@ Health measures (in the disconnected **All Measures** table; call by name, no pa
   (Experience `ML`, operation `AI Query`) carries the cost of answering; an `LlmPlugin` item
   (Experience `lake`) carries its OneLake reads and writes. Measured live, `ML` was 25,093 CU s
   against 5.17 CU s for `lake` on the same agent. Sum both for a total bill; read `ML` alone for
-  what a question costs. Never read `lake` alone.
+  what a question costs. Never read `lake` alone. The aggregates blend the two, and blend the
+  operation COUNT with them: one agent showed 49 operations in `Metrics By Item And Day` where it
+  had answered 14 questions, so dividing aggregate CU by aggregate operations understates cost per
+  question by about 3.5x. Item History keeps the two halves on separate rows.
 - **Throttling units differ**: `Throttling (min)` on the aggregate tables; `Throttling (s)` on the
   timepoint detail and on the health measures.
 - **`CU Detail` percentages**: delay/rejection `%` columns are fractions where `> 1.0` means the

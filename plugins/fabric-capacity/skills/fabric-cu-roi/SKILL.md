@@ -9,6 +9,11 @@ description: >
   "which reports to decommission", "wasteful capacity", "CU vs usage", "cost efficiency".
   Get the cost side with `query-fabric-capacity-cu` and the engagement side from the BI Pixie MCP
   server (or any usage source). For raw CU figures alone, use `query-fabric-capacity-cu`.
+compatibility: >
+  Any SKILL.md-aware agent (Claude Code, GitHub Copilot, Codex, Cursor). Needs Python 3
+  plus the Azure CLI (`az login`) or Fabric CLI (`fab auth login`) as a capacity admin.
+  Outside a Claude Code plugin install, ${CLAUDE_PLUGIN_ROOT} is unset: set it to the
+  copied `fabric-capacity` directory, or substitute that path in the commands below.
 allowed-tools: Bash
 ---
 
