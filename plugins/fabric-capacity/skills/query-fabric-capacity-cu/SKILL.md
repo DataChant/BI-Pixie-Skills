@@ -11,6 +11,11 @@ description: >
   For capacity health, throttling, overload, blocked workspaces, and the per-window who/what drill,
   use `diagnose-fabric-capacity`. For cost-efficiency (CU vs engagement), use `fabric-cu-roi`. For
   Fabric CLI sign-in and workspace discovery, use Microsoft's skills-for-fabric.
+compatibility: >
+  Any SKILL.md-aware agent (Claude Code, GitHub Copilot, Codex, Cursor). Needs Python 3
+  plus the Azure CLI (`az login`) or Fabric CLI (`fab auth login`) as a capacity admin.
+  Outside a Claude Code plugin install, ${CLAUDE_PLUGIN_ROOT} is unset: set it to the
+  copied `fabric-capacity` directory, or substitute that path in the commands below.
 allowed-tools: Bash
 ---
 
@@ -128,6 +133,12 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/run_dax.py" \
 
 Add `--json` for raw JSON output.
 
+**Pass the runner BARE `EVALUATE` statements.** `--capacity` prepends its own `DEFINE` block, and
+DAX allows only one per query, so handing it a query that already carries a `DEFINE` (anything
+copied from a blog post or from the Capacity Metrics report) fails with "The syntax for 'DEFINE' is
+incorrect". Either strip the `DEFINE` and pass `--capacity`, or keep the complete query and drop the
+flag. Every file in `examples/` is written bare, for the first path.
+
 Bundled example queries (in `${CLAUDE_PLUGIN_ROOT}/examples/`):
 - `list-capacities.dax` - capacities, ids, and state (get the `--capacity` GUID here)
 - `chargeback-cu-by-item.dax` - CU by item, kind, workspace (Chargeback)
@@ -135,11 +146,43 @@ Bundled example queries (in `${CLAUDE_PLUGIN_ROOT}/examples/`):
 - `chargeback-cu-by-domain.dax` - CU by Fabric domain and subdomain (Chargeback)
 - `capacity-metrics-cu-by-item.dax` - CU by item (Capacity Metrics; run with `--capacity`)
 - `cu-and-throttling-by-item.dax` - CU plus throttling, duration, operations, users per item
+- `ai-query-cost-by-agent.dax` - what each data agent costs per question (see below)
+- `ai-query-operations.dax` - each billed data agent question, with the minute it ran
 
 The `diagnose-fabric-capacity` skill bundles more: `capacity-health-overview.dax`,
 `throttling-windows.dax`, `capacity-system-events.dax`, `blocked-workspaces.dax`,
 `storage-by-workspace.dax`, `item-history-by-experience.dax` (CU by experience + per-item history),
 and `timepoint-operations.dax` (the per-window who/what drill).
+
+## What a Fabric data agent question costs
+
+Data agents are the one workload where the obvious query gives the wrong answer, so they get their
+own rule: **read the Item History tables, and read the `ML` row.**
+
+- **One agent bills as two items.** A `DataAgent` item (Experience `ML`, operation `AI Query`) is
+  the cost of answering the question. An `LlmPlugin` item (Experience `lake`) is its OneLake file
+  reads and writes. Measured live, `ML` was 25,093 CU s and `lake` was 5.17 CU s on the same agent.
+  Sum both for a total bill; read `ML` alone for cost per question.
+- **Do not go through `Items` + `Metrics By Item And Day`.** Those aggregates returned nothing at
+  all for two agents created and queried the same morning, worth 38,662 CU s between them, and
+  `Items[Item kind]` files agents under `DataAgent` or `LlmPlugin` inconsistently. Both problems
+  disappear in `Item History Main`, whose `ArtifactKind` was right for every agent tested.
+- **Microsoft's published rates**: 100 CU s per 1,000 input tokens, 10 per 1,000 cached input
+  tokens, 400 per 1,000 output tokens. A capacity's daily budget is SKU x 86,400 CU s.
+- **`Duration (s)` is not response time for `AI Query`.** It reports a flat 60 seconds per
+  operation, which is the billing window. It is real elapsed time for other operations.
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/scripts/run_dax.py" \
+  --workspace "Microsoft Fabric Capacity Metrics" \
+  --dataset "Fabric Capacity Metrics" --capacity <capacity-guid> \
+  --dax-file "${CLAUDE_PLUGIN_ROOT}/examples/ai-query-cost-by-agent.dax"
+```
+
+For a controlled measurement run, ask a fixed set of questions, wait about 15 minutes for usage data
+to land, then read `ai-query-operations.dax`. Confirm the capacity was not throttled during the run
+with `capacity-system-events.dax` first, and repeat the run several times: the same question set can
+come back at roughly double the cost with nothing changed.
 
 ## Which model to use
 
@@ -150,6 +193,12 @@ and `timepoint-operations.dax` (the per-window who/what drill).
 ## Gotchas
 
 - `DEFINE MPARAMETER` is mandatory for Capacity Metrics; the Chargeback model needs no parameter.
+- **Forgetting the parameter returns `0.0`, not an error.** A bare `MPARAMETER` outside a `DEFINE`
+  block fails loudly, but omitting it entirely succeeds and answers zero, which reads as a real
+  measurement of nothing. Treat a suspiciously quiet Capacity Metrics result as an unset parameter
+  until you have proved otherwise.
+- **For any window that includes today, use the Item History tables.** `Metrics By Item And Day` and
+  `Metrics By Item And Operation` are blind to items created the same day.
 - For a capacity **outside your home/default region**, also set `MPARAMETER 'RegionName' = "<region>"`
   in the same `DEFINE` block (the runner's `--region` flag), or its fact tables come back empty.
 - The models are versioned and column names drift (for example `Capacity Id` vs `capacity Id`).

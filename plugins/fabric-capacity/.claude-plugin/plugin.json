@@ -1,7 +1,7 @@
 {
   "name": "fabric-capacity",
   "description": "Talk to your Microsoft Fabric capacities from a Power BI Pro license: read CU usage (Capacity Metrics + Chargeback), diagnose capacity health, throttling, overload, blocked workspaces and affected users, and join CU cost with engagement for ROI. All read-only DAX over the Execute Queries REST API. Add-on to microsoft/skills-for-fabric.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "DataChant",
     "url": "https://datachant.com"
@@ -20,10 +20,5 @@
     "cost",
     "roi",
     "dax"
-  ],
-  "skills": [
-    "./skills/query-fabric-capacity-cu",
-    "./skills/diagnose-fabric-capacity",
-    "./skills/fabric-cu-roi"
   ]
 }

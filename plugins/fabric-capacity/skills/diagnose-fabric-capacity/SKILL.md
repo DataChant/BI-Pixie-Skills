@@ -12,6 +12,11 @@ description: >
   Triggers: "is my capacity throttling", "capacity health", "capacity at risk", "what overloaded my
   capacity", "blocked workspaces", "affected users", "overage", "who used my capacity".
   For pure CU/cost reading use query-fabric-capacity-cu; for cost-vs-engagement ROI use fabric-cu-roi.
+compatibility: >
+  Any SKILL.md-aware agent (Claude Code, GitHub Copilot, Codex, Cursor). Needs Python 3
+  plus the Azure CLI (`az login`) or Fabric CLI (`fab auth login`) as a capacity admin.
+  Outside a Claude Code plugin install, ${CLAUDE_PLUGIN_ROOT} is unset: set it to the
+  copied `fabric-capacity` directory, or substitute that path in the commands below.
 allowed-tools: Bash
 ---
 
