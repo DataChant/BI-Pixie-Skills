@@ -199,8 +199,11 @@ come back at roughly double the cost with nothing changed.
   until you have proved otherwise.
 - **For any window that includes today, use the Item History tables.** `Metrics By Item And Day` and
   `Metrics By Item And Operation` are blind to items created the same day.
-- For a capacity **outside your home/default region**, also set `MPARAMETER 'RegionName' = "<region>"`
-  in the same `DEFINE` block (the runner's `--region` flag), or its fact tables come back empty.
+- `MPARAMETER 'RegionName'` decides which region the cross-capacity **health** measures read, and a
+  capacity outside that region reads as Healthy with no usage. The CU fact tables this skill reads
+  are scoped by `CapacitiesList` instead, and returned identical results with and without
+  `RegionName` (measured on a Central US capacity and on a home-region one). For health, use
+  `diagnose-fabric-capacity`, whose runner reads every region (`--all-regions`).
 - The models are versioned and column names drift (for example `Capacity Id` vs `capacity Id`).
   Detect the version or resolve columns defensively for anything durable.
 - These models are preview and "unsupported for direct query." Read-only `EVALUATE` only.

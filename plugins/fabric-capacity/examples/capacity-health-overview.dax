@@ -1,6 +1,11 @@
 // Cross-capacity health overview (the Capacity Metrics "Health" page).
-// Needs NO parameter: the "... by capacity (last 24 hours)" measures spread across every
-// capacity you administer. Swap "(last 24 hours)" for "(last 1 hour)" for near-real-time.
+// Needs no --capacity: the "... by capacity (last 24 hours)" measures spread across every capacity
+// you administer. They read ONE region per query, though (MPARAMETER 'RegionName', your home region
+// when unset), and a capacity in any other region reads Healthy with 0% utilization and no users
+// even while it throttles. Run with --all-regions (the runner turns it on for these measures by
+// itself): it reads each capacity region in turn and keeps every capacity's row from the read of its
+// own region, which is why Capacities[Region] must stay in the column list.
+// Swap "(last 24 hours)" for "(last 1 hour)" for near-real-time.
 EVALUATE
 SUMMARIZECOLUMNS(
     Capacities[Capacity name],

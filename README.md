@@ -77,8 +77,10 @@ The Capacity Metrics and Chargeback apps publish semantic models you can query r
 `POST /v1.0/myorg/datasets/{datasetId}/executeQueries`. The Capacity Metrics model gates its
 DirectQuery fact tables behind a `CapacitiesList` Power Query parameter that you set with a
 `DEFINE MPARAMETER` prefix (the one detail that is easy to get wrong), plus a `TimePoint` parameter
-for the 30-second drill. Its cross-capacity **health** measures, by contrast, need no parameter at
-all. The Chargeback model is fully imported, so a plain `EVALUATE` works and it adds per-user,
+for the 30-second drill. Its cross-capacity **health** measures need no capacity parameter, but they
+read one region at a time through a `RegionName` parameter, so a capacity outside the region being
+read looks healthy and idle; the bundled runner reads every region your capacities are in. The
+Chargeback model is fully imported, so a plain `EVALUATE` works and it adds per-user,
 per-experience, and per-domain grain. Always resolve the models by **name** (the GUIDs rotate on
 reinstall). See each skill for copy-paste queries, or the
 [model guide](plugins/fabric-capacity/references/capacity-model-guide.md) for the full map.

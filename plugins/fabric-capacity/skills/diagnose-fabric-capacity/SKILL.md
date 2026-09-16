@@ -44,31 +44,41 @@ The bundled runner handles auth, name resolution, and the parameters:
 
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/run_dax.py" \
-  --workspace "Fabric Capacity Metrics" --dataset "Fabric Capacity Metrics" \
-  [--capacity <guid>] [--region "East US"] [--timepoint 2026-06-27T12:12:30] \
+  --workspace "Microsoft Fabric Capacity Metrics" --dataset "Fabric Capacity Metrics" \
+  [--capacity <guid>] [--region "East US" | --all-regions] [--timepoint 2026-06-27T12:12:30] \
   --dax-file "${CLAUDE_PLUGIN_ROOT}/examples/<file>.dax"   # or --dax "EVALUATE ..."
 ```
 
-`--capacity` adds `MPARAMETER 'CapacitiesList'`; `--region` adds `MPARAMETER 'RegionName'` (needed
-only for a capacity outside your home/default region; add it if such a capacity returns no rows);
-`--timepoint` adds `MPARAMETER 'TimePoint'`. Pass plain `EVALUATE` statements; the runner builds the
-single `DEFINE` block. Add `--json` for raw rows. If the workspace name lookup misses (a reinstall
-can append a timestamp to it), pass the workspace ID instead.
+`--capacity` adds `MPARAMETER 'CapacitiesList'`; `--timepoint` adds `MPARAMETER 'TimePoint'`;
+`--region` adds `MPARAMETER 'RegionName'` for one region, and `--all-regions` runs the query once per
+region your capacities are in, keeping each capacity's row from the read of its own region. The
+health measures in step 1 need that, and the runner turns `--all-regions` on for them by itself.
+Pass plain `EVALUATE` statements; the runner builds the single `DEFINE` block. Add `--json` for raw
+rows. If the workspace name lookup misses (a reinstall can append a timestamp to it), pass the
+workspace ID instead.
 
 ## The diagnostic workflow (top down)
 
 Drill from "all my capacities" to "the exact operation at one 30-second window".
 
-### 1. Health of every capacity (no parameter)
+### 1. Health of every capacity, in every region (`--all-regions`)
 
-Start here. The `... by capacity (last 24 hours)` measures spread across all capacities you
-administer, so one call ranks them by risk, utilization, throttling, P95 delays, and affected users.
+Start here. The `... by capacity (last 24 hours)` measures spread across every capacity you
+administer, so one read ranks them by risk, utilization, throttling, P95 delays, and affected users.
+They answer for **one region per query**, though: a capacity outside the region being read comes
+back Healthy, with 0% utilization and no users, even while it is throttling. `--all-regions` reads
+each region your capacities are in and keeps every capacity's row from the read of its own region.
 
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/run_dax.py" \
   --workspace "Microsoft Fabric Capacity Metrics" --dataset "Fabric Capacity Metrics" \
+  --all-regions \
   --dax-file "${CLAUDE_PLUGIN_ROOT}/examples/capacity-health-overview.dax"
 ```
+
+The runner prints `Reading region: ...` once per region, and turns `--all-regions` on by itself for
+these measures if the flag is left off. If you edit the query, keep `Capacities[Region]` among its
+columns: the runner needs it to match each row to its region, and stops with an error without it.
 
 `Risk` values include `Healthy`, `At Risk of Throttling`, `Throttling`, `Interactive Rejection`,
 `Background Rejection`, `Overage Billing Active`, `Suspended`. Swap `(last 24 hours)` for
@@ -132,6 +142,10 @@ Give the admin a short, ranked answer, not a raw dump:
 
 ## Gotchas
 
+- **Healthy, with 0% utilization and no users, is also what an unread region looks like.** Before
+  reporting an all-clear for a capacity, confirm the run printed a `Reading region:` line for that
+  capacity's region. With `--capacity`, only the named capacity's health row is meaningful: the
+  other capacities in its region are still listed, reading zero.
 - `Throttling (min)` on aggregate tables vs `Throttling (s)` on timepoint detail and health measures.
 - The timepoint detail tables carry the item GUID in `[Item]`; the example joins to `Items` for the
   name (a live relationship exists).
