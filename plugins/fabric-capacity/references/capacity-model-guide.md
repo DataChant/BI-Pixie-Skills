@@ -38,18 +38,27 @@ POST https://api.powerbi.com/v1.0/myorg/datasets/{datasetId}/executeQueries
 
   - `MPARAMETER 'CapacitiesList' = { "<capacity-guid-lowercase>" }` scopes the CU/throttling/storage
     facts to one (or several) capacities. Required for nearly every Capacity Metrics fact query.
-  - `MPARAMETER 'RegionName' = "East US"` scopes to a capacity's region. The home/default region
-    works without it, but a capacity in another region needs it. The report sets it on the Health
-    page paired with a `TREATAS({"East US"}, 'Capacities'[Region])` filter. Rule of thumb: if a
-    non-home-region capacity returns no fact rows, add `RegionName` set to that capacity's `Region`.
+  - `MPARAMETER 'RegionName' = "East US"` picks the **one** capacity region that the cross-capacity
+    health measures read (see the warning below). The report sets it from the Health page's region
+    slicer, paired with a `TREATAS({"East US"}, 'Capacities'[Region])` filter. Pass a value exactly
+    as **this model's** `Capacities[Region]` shows it, and take it from there rather than from
+    anywhere else: on the test tenant the home-region capacity read `Default` in Capacity Metrics
+    while Chargeback named the same capacity's region `North Central US`, and `"Default"` returned
+    what an unset parameter returns while `"North Central US"` returned all zeros without
+    complaining. An invented name does fail loudly (`"Nowhere Region"`, HTTP 500), so neither a
+    quiet zero nor an error tells you the value was right. The per-capacity fact tables do not
+    depend on it: measured on 2026-09-15, `CU Detail`, `System Events`, `Item History Operation`,
+    `Metrics By Item And Day` and `Storage By Workspaces` returned identical results with and
+    without `RegionName` once `CapacitiesList` was set, both for a Central US capacity and for a
+    home-region capacity read under `"Central US"`.
   - `MPARAMETER 'TimePoint' = (DATE(y,m,d) + TIME(h,mi,s))` selects one 30-second window for the
     timepoint-detail tables (`Timepoint Interactive Detail`, `Timepoint Background Detail`). Combine
     with `CapacitiesList` in the **same** `DEFINE` block.
 
   All three go in one `DEFINE` block. The report's own queries (captured via Log Analytics) scope
   with `TREATAS({"<guid>"}, 'Capacities'[Capacity Id])` rather than `FILTER(...)`, and wrap each
-  measure in `IGNORE(...)`; both are equivalent to the patterns here. The runner's `--region`,
-  `--capacity`, and `--timepoint` flags assemble the block for you.
+  measure in `IGNORE(...)`; both are equivalent to the patterns here. The runner's `--region` (or
+  `--all-regions`), `--capacity`, and `--timepoint` flags assemble the block for you.
 
   ```dax
   DEFINE
@@ -58,13 +67,38 @@ POST https://api.powerbi.com/v1.0/myorg/datasets/{datasetId}/executeQueries
   EVALUATE ...
   ```
 
-**Exception worth knowing:** the cross-capacity **Health** measures (the `... by capacity (last 24
-hours)` family) need **no parameter at all**. They aggregate over the imported side and spread across
-the `Capacities` dimension, so you get every capacity you administer in one call.
+**Warning: the cross-capacity Health measures read one region at a time.** The `... by capacity
+(last 24 hours)` family needs no `CapacitiesList`: it spreads across the `Capacities` dimension, so
+one call covers every capacity you administer **in the region `RegionName` names**, which is your
+home region when the parameter is unset. Every capacity in any other region comes back **Healthy,
+with 0% utilization, no throttling and no users**, even while it is throttling. Nothing errors, so
+the answer reads as an all-clear. Measured on 2026-09-15 against a Central US F8 that had been
+overloaded that morning:
 
-The bundled `scripts/run_dax.py` injects both parameters for you: `--capacity <guid>` and
-`--timepoint 2026-06-27T12:12:30`. Pass plain `EVALUATE` statements; let the script build the
-`DEFINE`.
+| | `RegionName` unset | `RegionName = "Central US"` |
+|---|---|---|
+| Risk | Healthy | Throttling |
+| Average utilization | 0% | 8.7% |
+| Throttling in the last 24 hours | 0 s | 3,700 s |
+| Users | 0 | 3 |
+
+A Central US trial capacity on the same tenant also read all zeros until the region was set. So read
+the health measures once per region, and take each capacity's row from the read of **its own**
+region; never merge the reads by keeping the larger value. The runner's `--all-regions` does exactly
+that, and turns itself on for any query that uses these measures unless you pass `--region`. It needs
+`Capacities[Region]` among the query's columns to tell the rows apart.
+
+Three related findings. Adding `CapacitiesList` to a health query while leaving `RegionName` unset
+failed with "Error obtaining data location", so the runner scopes `--all-regions` to that capacity's
+own region when you pass `--capacity`. With `CapacitiesList` set, the other capacities in that region
+are still returned, reading zero on every measure, so only the named capacity's row means anything.
+And whether a home-region capacity reads zero under another region's read could not be measured,
+because the only such capacity on the test tenant is suspended and had no activity inside the health
+measures' window. Keeping each capacity's row from its own region is correct either way.
+
+The bundled `scripts/run_dax.py` injects the parameters for you: `--capacity <guid>`,
+`--timepoint 2026-06-27T12:12:30`, and either `--region "East US"` or `--all-regions`. Pass plain
+`EVALUATE` statements; let the script build the `DEFINE`.
 
 ## Question -> where to get it
 
@@ -72,8 +106,8 @@ Each row is a real, tested query. The example files live in `examples/`.
 
 | Admin question | Model | Table(s) / measures | Example | Param |
 |----------------|-------|---------------------|---------|-------|
-| Which capacities are healthy / at risk / throttling right now? | Metrics | `Capacities` + `[Risk status by capacity (last 24 hours)]`, `[Average utilization by capacity ...]`, `[Throttling(s) by capacity ...]`, `[P95 interactive delay by capacity ...]` | `capacity-health-overview.dax` | none |
-| Near-real-time health (last hour) | Metrics | same measures, swap `(last 1 hour)` | `capacity-health-overview.dax` | none |
+| Which capacities are healthy / at risk / throttling right now? | Metrics | `Capacities` + `[Risk status by capacity (last 24 hours)]`, `[Average utilization by capacity ...]`, `[Throttling(s) by capacity ...]`, `[P95 interactive delay by capacity ...]` | `capacity-health-overview.dax` | `--all-regions` (automatic) |
+| Near-real-time health (last hour) | Metrics | same measures, swap `(last 1 hour)` | `capacity-health-overview.dax` | `--all-regions` (automatic) |
 | What is consuming my CU? Top items | Metrics | `Items` + `Metrics By Item And Operation`/`...And Day`[CU (s)] (**blind to items created today**, see Gotchas) | `cu-and-throttling-by-item.dax` | `--capacity` |
 | What changed recently? CU by item over a date range | Metrics | `Items` + `Metrics By Item And Day`[CU (s)] filtered on `[Date]` | `cu-by-item-last-n-days.dax` | `--capacity` |
 | CU by user / by experience | Chargeback | `Chargeback`[User], [Experience], [CU (s)] | `chargeback-cu-by-user.dax` | none |
@@ -91,7 +125,7 @@ Each row is a real, tested query. The example files live in `examples/`.
 | Per-question detail for a data agent measurement run | Metrics | `Item History Operation Detail`[OperationStartTime],[CU (s)],[Operations] | `ai-query-operations.dax` | `--capacity` |
 | An item's day-by-day history | Metrics | `Item History Main` + `Item History Operation`[Day] | `item-history-by-experience.dax` (add `[Day]`) | `--capacity` |
 | Billed overage / carryforward over time | Metrics | `[Processed overage]`, `[Overage billing limit CUhr]`, `CU Detail[Processed overage]` | (adapt) | `--capacity` |
-| List capacities + ids + state | Metrics | `Capacities` | `list-capacities.dax` | none |
+| List capacities + ids + state + region | Metrics | `Capacities` | `list-capacities.dax` | none |
 
 ## Capacity Metrics: key tables and columns (real, from the live model)
 
@@ -169,7 +203,8 @@ AND('Dates'[Date] >= DATE(2026,6,10), 'Dates'[Date] < DATE(2026,6,30)))`, groupi
 `FILTER('Metrics By Item And Day', 'Metrics By Item And Day'[Date] >= TODAY() - 7)` (see
 `cu-by-item-last-n-days.dax`). `TODAY()` evaluates in the model's timezone, not the caller's.
 
-Health measures (in the disconnected **All Measures** table; call by name, no parameter):
+Health measures (in the disconnected **All Measures** table; call by name, with no `CapacitiesList`
+but **one region per read**, see the warning above):
 
 - `[Count of capacities]`, and per-capacity: `[Risk status by capacity (last 24 hours)]`,
   `[Average utilization by capacity (last 24 hours)]`, `[Throttling(s) by capacity (last 24 hours)]`,
@@ -197,6 +232,16 @@ Health measures (in the disconnected **All Measures** table; call by name, no pa
   with no parameter answers `0.0` and exits 0. Always confirm a non-empty `Capacities` scope before
   believing a quiet result. (A *malformed* parameter does fail loudly: a bare `MPARAMETER` line
   outside a `DEFINE` block returns "The syntax for 'MPARAMETER' is incorrect".)
+- **An unset `RegionName` answers Healthy for every capacity outside your home region.** The same
+  shape as the bullet above, one measure family along: the health measures read one region per
+  query, so a capacity elsewhere comes back Healthy, with 0% utilization and no users, while it is
+  throttling. Read every region (`--all-regions`) before believing an all-clear. See the warning
+  under the parameters above.
+- **Chargeback is only as fresh as the app's last refresh.** On the test tenant on 2026-09-15 the
+  newest `Chargeback[Date]` was 2026-08-27, while Capacity Metrics had same-day data, and a capacity
+  created on 2026-09-05 was missing from Chargeback's own `Capacities` table rather than merely from
+  its facts. Read `MAX(Chargeback[Date])` before treating a quiet Chargeback result as an answer.
+  Region is not the issue there: one Chargeback call returned capacities in three regions.
 - **The aggregate fact tables are blind to items created the same day.** `Metrics By Item And Day`
   and `Metrics By Item And Operation` returned **no rows at all** for two data agents built and
   queried that morning, together worth 38,662 CU s, while `Item History Operation` reported both in

@@ -1,8 +1,11 @@
+// Every capacity with its id, SKU, state and region. The region is the value to pass to --region
+// (the health measures read one region per query; --all-regions reads them all).
 EVALUATE
 SELECTCOLUMNS(
     Capacities,
     "Capacity", Capacities[Capacity name],
     "Capacity Id", Capacities[Capacity Id],
     "SKU", Capacities[SKU],
-    "State", Capacities[State]
+    "State", Capacities[State],
+    "Region", Capacities[Region]
 )
